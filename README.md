@@ -11,3 +11,5 @@ The Jenkins image itself is build off the provided Dockerfile.
 ### Future updates
 1. Backup LDAP files with openldap-backup, untested.
 2. Terraform or Cloudformation some AWS architecture to make public instances.
+3. Need to add more building packages than just 'git' to the agents. Wasn't relevant for my base use case.
+
