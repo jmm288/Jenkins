@@ -1,0 +1,93 @@
+version: '3.9'
+services:
+  jenkins-controller:
+    container_name: jenkins-blueocean
+    build: .
+    ports: 
+      - "5000:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins-data:/var/jenkins_home
+      - jenkins-docker-certs:/certs/client:ro
+    networks:
+      jenkins:
+    environment:
+      - DOCKER_HOST=tcp://docker:2376
+      - DOCKER_CERT_PATH=/certs/client
+      - DOCKER_TLS_VERIFY=1
+
+  jenkins-docker:
+    container_name: docker
+    image: docker:dind
+    privileged: true
+    ports:
+      - "2376:2376"
+    volumes:
+      - jenkins-docker-certs:/certs/clients
+      - jenkins-data:/var/jenkins_home
+    networks:
+      jenkins:
+    environment:
+      - DOCKER_TLS_CERTDIR=/certs
+
+  jenkins-agent0:
+    container_name: agent0
+    build: ./agents_config
+    depends_on:
+      - jenkins-controller
+    ports:
+      - "22:22"
+    networks:
+      jenkins:
+    environment:
+      - JENKINS_AGENT_SSH_PUBKEY=${JenkinsPublicKey}
+      - ${VARS}
+
+  openldap:
+    container_name: openldap
+    image: osixia/openldap:1.5.0
+    ports:
+      - "389:389"
+      - "636:636"
+    volumes:
+      - /data/slapd/database:/var/lib/ldap
+      - /data/slapd/config:/etc/ldap/slapd.d
+    domainname: "mycompany.org"
+    hostname: "ldap-server"
+    environment:
+      LDAP_DOMAIN: "mycompany.org"
+      LDAP_ADMIN_PASSWORD: "jbartonadmin"
+    networks:
+      jenkins:
+
+  openldap-backup:
+    container_name: openldap-backup
+    image: osixia/openldap-backup:1.5.0
+    volumes:
+      - /data/openldap/backup:/data/backup
+    environment:
+      - LDAP_BACKUP_CONFIG_CRON_EXP="0 4 * * *"
+      - LDAP_BACKUP_DAA_CRON_EXP="0 4 * * *"
+      - LDAP_BACKUP_TTL=15
+    networks:
+      jenkins:
+
+  phpldapadmin:
+    image: osixia/phpldapadmin:latest
+    container_name: phpldapadmin
+    environment:
+      PHPLDAPADMIN_LDAP_HOSTS: "openldap"
+      PHPLDAPADMIN_HTTPS: "false"
+    ports:
+      - "5001:80"
+    depends_on:
+      - openldap
+    networks:
+      jenkins:
+
+volumes:
+  jenkins-data: {}
+  jenkins-docker-certs: {}
+networks:
+  jenkins:
+    
